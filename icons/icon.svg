@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1f7a55"/>
+  <rect x="96" y="104" width="196" height="276" rx="24" fill="#f4f1e8" stroke="#0f1714" stroke-width="6"/>
+  <text x="194" y="290" font-family="DejaVu Sans, Arial, sans-serif" font-size="150" text-anchor="middle" fill="#17201b">♠</text>
+  <rect x="220" y="140" width="196" height="276" rx="24" fill="#ffffff" stroke="#0f1714" stroke-width="6"/>
+  <text x="318" y="326" font-family="DejaVu Sans, Arial, sans-serif" font-size="150" text-anchor="middle" fill="#c8312b">♥</text>
+</svg>
