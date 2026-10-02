@@ -1,7 +1,7 @@
 {
-  "name": "Kaartscores – Kleurenwiezen & Chinees poepen",
+  "name": "Kaartscores – Kleurenwiezen, Chinees poepen & Hartenjagen",
   "short_name": "Kaartscores",
-  "description": "Scoreblad voor kleurenwiezen en chinees poepen, werkt offline.",
+  "description": "Scoreblad voor kleurenwiezen, chinees poepen en hartenjagen, werkt offline.",
   "lang": "nl",
   "start_url": "./",
   "scope": "./",

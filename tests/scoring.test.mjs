@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as W from '../js/wiezen.js';
 import * as P from '../js/poepen.js';
+import * as H from '../js/harten.js';
 
 const sum = (a) => a.reduce((x, y) => x + y, 0);
 
@@ -108,4 +109,35 @@ test('poepen round plan', () => {
   assert.equal(plan[0], 1);
   assert.equal(plan.at(-1), 1);
   assert.equal(P.maxCards(4), 12);
+});
+
+test('harten: hearts plus queen of spades', () => {
+  assert.deepEqual(H.scoreRound({ hearts: [3, 5, 0, 5], queen: 1 }), [3, 18, 0, 5]);
+  assert.deepEqual(H.scoreRound({ hearts: [0, 0, 13, 0], queen: 3 }), [0, 0, 13, 13]);
+});
+
+test('harten: every normal round hands out 26 points', () => {
+  for (let h = 0; h <= 13; h++) for (let q = 0; q < 4; q++) {
+    const r = { hearts: [h, 13 - h, 0, 0], queen: q };
+    if (H.shooter(r) == null) assert.equal(sum(H.scoreRound(r)), 26);
+  }
+});
+
+test('harten: alles halen gives the others 26 each', () => {
+  assert.deepEqual(H.scoreRound({ hearts: [13, 0, 0, 0], queen: 0 }), [0, 26, 26, 26]);
+  assert.equal(H.shooter({ hearts: [0, 0, 13, 0], queen: 2 }), 2);
+  assert.equal(H.shooter({ hearts: [13, 0, 0, 0], queen: 1 }), null);
+});
+
+test('harten: validate', () => {
+  assert.ok(H.validate({ hearts: [3, 3, 3, 3], queen: 0 }));
+  assert.ok(H.validate({ hearts: [4, 3, 3, 3], queen: null }));
+  assert.equal(H.validate({ hearts: [4, 3, 3, 3], queen: 2 }), null);
+});
+
+test('harten: pass cycle and game end', () => {
+  assert.deepEqual([0, 1, 2, 3, 4].map(H.passFor), ['links', 'rechts', 'tegenover', 'geen', 'links']);
+  assert.equal(H.isOver([99, 0, 50, 20], 100), false);
+  assert.equal(H.isOver([100, 0, 50, 20], 100), true);
+  assert.equal(H.isOver([12, 0, 130, 20], 100), true);
 });

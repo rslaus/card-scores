@@ -1,6 +1,6 @@
 # Kaartscores
 
-Scoreblad voor **kleurenwiezen** en **chinees poepen** op je gsm. Werkt ook zonder internet.
+Scoreblad voor **kleurenwiezen**, **chinees poepen** en **hartenjagen** op je gsm. Werkt ook zonder internet.
 
 👉 **Open de app: <https://rslaus.github.io/card-scores/>**
 
@@ -35,11 +35,13 @@ Open de app **één keer met internet**. Daarna werkt hij ook zonder verbinding,
 1. Kies een spel en vul de namen in **volgens zitvolgorde** (met de klok mee). Speler 1 deelt eerst.
    - Kleurenwiezen: precies 4 spelers. Kies vooraf hoeveel rondes je speelt.
    - Chinees poepen: 2 of meer spelers. Het aantal rondes volgt uit het aantal spelers (1 kaart → maximum → 1 kaart).
+   - Hartenjagen: precies 4 spelers. Kies tot hoeveel strafpunten je speelt (50, 100 of 200).
 2. Tik na elke ronde op **+ Ronde invoeren**.
    - **Kleurenwiezen:** kies het contract, wie er speelt, het bod, de troef (optioneel) en hoeveel slagen er gehaald zijn. De app rekent de punten uit en toont ze vóór je opslaat. Bij een **rondje pas** telt de volgende ronde dubbel.
    - **Chinees poepen:** geef per speler in hoeveel slagen gevraagd en gehaald zijn.
+   - **Hartenjagen:** geef per speler in hoeveel harten die haalde en duid aan wie de schoppenvrouw kreeg. Haalt iemand alles, dan krijgen de anderen elk 26 strafpunten. De app toont ook naar wie je kaarten doorgeeft.
 3. Een fout gemaakt? Tik op **Ongedaan** of **Bewerken**, of tik op eender welke ronde in de lijst om ze aan te passen.
-4. Na de laatste ronde toont de app automatisch de winnaar.
+4. Na de laatste ronde toont de app automatisch de winnaar. Bij hartenjagen stopt het spel zodra iemand de limiet bereikt, en wint wie de **minste** strafpunten heeft.
 
 Rechtsboven wissel je tussen donkere en lichte modus.
 
@@ -56,6 +58,7 @@ De puntentelling volgt deze regels:
 
 - [Kleurenwiezen](kleurenwiezen-regels.md) (volgens Whisthub)
 - [Chinees poepen](chinees-poepen-rules.md)
+- [Hartenjagen](hartenjagen-regels.md) (volgens Whisthub)
 
 ---
 
@@ -68,7 +71,7 @@ python3 -m http.server 8000      # open http://localhost:8000
 node --test tests/*.test.mjs     # tests van de puntentelling
 ```
 
-- `js/wiezen.js` en `js/poepen.js`: puntentelling (los van de DOM, getest in `tests/`)
+- `js/wiezen.js`, `js/poepen.js` en `js/harten.js`: puntentelling (los van de DOM, getest in `tests/`)
 - `js/app.js`: schermen, opslag (localStorage) en navigatie
 - `sw.js`: service worker voor offline gebruik. **Verhoog `CACHE_VERSION`** bij elke wijziging, anders blijven geïnstalleerde apps de oude versie gebruiken.
 

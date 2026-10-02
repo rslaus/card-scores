@@ -1,5 +1,6 @@
 import * as W from './wiezen.js';
 import * as P from './poepen.js';
+import * as H from './harten.js';
 
 // ---------- persistence ----------
 const KEY = 'kaartscores.v1';
@@ -18,16 +19,24 @@ function save() {
 // ---------- helpers ----------
 const GAMES = {
   wiezen: { name: 'Kleurenwiezen', icon: '♠', blurb: '4 spelers · vragen, meegaan, alleen, miserie…' },
-  poepen: { name: 'Chinees poepen', icon: '♥', blurb: '2+ spelers · voorspel je slagen' },
+  poepen: { name: 'Chinees poepen', icon: '♦', red: true, blurb: '2+ spelers · voorspel je slagen' },
+  // lowWins: scores are penalty points, the lowest total wins
+  harten: { name: 'Hartenjagen', icon: '♥', red: true, lowWins: true, blurb: '4 spelers · zo weinig mogelijk strafpunten' },
 };
 const app = document.getElementById('app');
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const fmt = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + -n : '0');
 const num = (n) => (n < 0 ? '−' + -n : String(n));
 const cls = (n) => (n > 0 ? 'pos' : n < 0 ? 'neg' : 'zero');
+// Colour class for a score: for penalty games more points is bad.
+const tone = (g, n) => cls(GAMES[g.type].lowWins ? -n : n);
+const best = (g, t) => (GAMES[g.type].lowWins ? Math.min(...t) : Math.max(...t));
+const unit = (g) => (GAMES[g.type].lowWins ? 'strafpunten' : 'punten');
 
 function deltas(g) {
-  return g.type === 'wiezen' ? W.scoreRounds(g.rounds) : P.scoreRounds(g.rounds);
+  if (g.type === 'wiezen') return W.scoreRounds(g.rounds);
+  if (g.type === 'harten') return H.scoreRounds(g.rounds);
+  return P.scoreRounds(g.rounds);
 }
 function cumulative(g) {
   let acc = g.players.map(() => 0);
@@ -37,22 +46,37 @@ function totals(g) {
   const c = cumulative(g);
   return c.length ? c[c.length - 1] : g.players.map(() => 0);
 }
+// null for harten: that game runs until someone reaches the point limit
 function totalRounds(g) {
+  if (g.type === 'harten') return null;
   return g.type === 'wiezen' ? g.targetRounds : P.roundPlan(g.players.length).length;
 }
 function doneRounds(g) {
   return g.type === 'wiezen' ? W.playedCount(g.rounds) : g.rounds.length;
 }
 function isOver(g) {
-  return !!g.ended || doneRounds(g) >= totalRounds(g);
+  if (g.ended) return true;
+  if (g.type === 'harten') return H.isOver(totals(g), g.limit);
+  return doneRounds(g) >= totalRounds(g);
 }
 function dealerAt(g, i) {
-  return g.type === 'wiezen' ? W.dealerFor(g.rounds, i) : P.dealerFor(g.players.length, i);
+  if (g.type === 'wiezen') return W.dealerFor(g.rounds, i);
+  if (g.type === 'harten') return H.dealerFor(i);
+  return P.dealerFor(g.players.length, i);
+}
+// "ronde 3 / 16", or "ronde 3 · tot 100" for harten
+function progress(g) {
+  const next = doneRounds(g) + 1;
+  return g.type === 'harten' ? `ronde ${next} · tot ${g.limit}` : `ronde ${next} / ${totalRounds(g)}`;
+}
+function passLabel(i) {
+  const dir = H.passFor(i);
+  return dir === 'geen' ? 'geen doorgifte' : `doorgeven: <strong>${dir}</strong>`;
 }
 function winners(g) {
   const t = totals(g);
-  const max = Math.max(...t);
-  return t.map((v, i) => (v === max ? i : -1)).filter((i) => i >= 0);
+  const top = best(g, t);
+  return t.map((v, i) => (v === top ? i : -1)).filter((i) => i >= 0);
 }
 function archiveCurrent() {
   const g = data.current;
@@ -135,12 +159,12 @@ function renderHome() {
     resume = `
       <button class="btn btn-primary btn-xl resume" data-act="resume">
         <span>${over ? 'Laatste spel bekijken' : 'Verder spelen'}</span>
-        <small>${GAMES[g.type].name} · ${over ? 'afgelopen' : `ronde ${doneRounds(g) + 1} / ${totalRounds(g)}`}</small>
+        <small>${GAMES[g.type].name} · ${over ? 'afgelopen' : progress(g)}</small>
       </button>`;
   }
   const games = Object.entries(GAMES).map(([id, m]) => `
     <button class="btn game-pick" data-act="new" data-type="${id}">
-      <span class="game-icon ${id === 'poepen' ? 'red' : ''}">${m.icon}</span>
+      <span class="game-icon ${m.red ? 'red' : ''}">${m.icon}</span>
       <span class="game-text"><strong>${m.name}</strong><small>${m.blurb}</small></span>
     </button>`).join('');
   const archive = data.archive.length ? `
@@ -153,17 +177,20 @@ function renderHome() {
 }
 
 // ---------- setup ----------
+// wiezen and harten are always played with exactly 4
+const fixed4 = (type) => type !== 'poepen';
+
 function startSetup(type, players) {
   const prev = players ?? data.lastNames[type] ?? [];
-  const count = type === 'wiezen' ? 4 : Math.max(prev.length, 4);
+  const count = fixed4(type) ? 4 : Math.max(prev.length, 4);
   const names = Array.from({ length: count }, (_, i) => prev[i] ?? '');
-  setup = { type, names, targetRounds: data.current?.targetRounds ?? 16 };
+  setup = { type, names, targetRounds: data.current?.targetRounds ?? 16, limit: data.current?.limit ?? 100 };
   go('setup');
 }
 
 function setupError() {
   const names = setup.names.map((n) => n.trim());
-  if (setup.type === 'wiezen' && names.length !== 4) return 'Kleurenwiezen speel je met precies 4 spelers';
+  if (fixed4(setup.type) && names.length !== 4) return `${GAMES[setup.type].name} speel je met precies 4 spelers`;
   if (names.length < P.MIN_PLAYERS) return 'Minstens 2 spelers';
   if (names.some((n) => !n)) return 'Vul alle namen in';
   if (new Set(names.map((n) => n.toLowerCase())).size !== names.length) return 'Elke naam moet uniek zijn';
@@ -179,30 +206,37 @@ function updateSetupValidity() {
 
 function renderSetup() {
   const s = setup;
-  const wiezen = s.type === 'wiezen';
+  const fixed = fixed4(s.type);
   const rows = s.names.map((n, i) => `
     <div class="name-row">
       <span class="seat">${i + 1}</span>
       <input type="text" inputmode="text" autocomplete="off" autocapitalize="words" maxlength="16"
         placeholder="Speler ${i + 1}" value="${esc(n)}" data-name="${i}" enterkeyhint="next">
-      ${!wiezen && s.names.length > P.MIN_PLAYERS ? `<button class="btn btn-icon" data-act="setup-remove" data-i="${i}" aria-label="Verwijder speler">✕</button>` : ''}
+      ${!fixed && s.names.length > P.MIN_PLAYERS ? `<button class="btn btn-icon" data-act="setup-remove" data-i="${i}" aria-label="Verwijder speler">✕</button>` : ''}
     </div>`).join('');
   let extra = '';
-  if (wiezen) {
+  if (s.type === 'wiezen') {
     extra = `
       <h2>Aantal rondes</h2>
       <div class="seg">${[8, 12, 16, 20, 24].map((r) => `
         <button class="btn chip" aria-pressed="${s.targetRounds === r}" data-act="setup-rounds" data-n="${r}">${r}</button>`).join('')}
       </div>`;
+  } else if (s.type === 'harten') {
+    extra = `
+      <h2>Spelen tot</h2>
+      <div class="seg seg-${H.LIMITS.length}">${H.LIMITS.map((l) => `
+        <button class="btn chip" aria-pressed="${s.limit === l}" data-act="setup-limit" data-n="${l}">${l} <small>strafpunten</small></button>`).join('')}
+      </div>
+      <p class="note">Het spel stopt zodra iemand de limiet bereikt. Minste strafpunten wint.</p>`;
   } else {
     const n = s.names.length;
     extra = `<p class="note">Max ${P.maxCards(n)} kaarten per speler · ${P.roundPlan(n).length} rondes (1 → ${P.maxCards(n)} → 1)</p>`;
   }
   return `
     <h2>Spelers</h2>
-    <p class="note">${wiezen ? 'Precies 4 spelers. ' : ''}Vul in volgens zitvolgorde (met de klok mee). Speler 1 deelt eerst.</p>
+    <p class="note">${fixed ? 'Precies 4 spelers. ' : ''}Vul in volgens zitvolgorde (met de klok mee). Speler 1 deelt eerst.</p>
     <div class="stack">${rows}</div>
-    ${!wiezen && s.names.length < P.MAX_PLAYERS ? `<button class="btn btn-ghost" data-act="setup-add">+ Speler toevoegen</button>` : ''}
+    ${!fixed && s.names.length < P.MAX_PLAYERS ? `<button class="btn btn-ghost" data-act="setup-add">+ Speler toevoegen</button>` : ''}
     ${extra}
     <div class="bottom-bar">
       <p id="setup-msg" class="msg"></p>
@@ -218,12 +252,12 @@ function renderGame() {
   const n = g.players.length;
   const nextIdx = g.rounds.length;
   const dealer = over ? -1 : dealerAt(g, nextIdx);
-  const lead = g.rounds.length ? Math.max(...t) : null;
+  const lead = g.rounds.length ? best(g, t) : null;
 
   const board = g.players.map((p, i) => `
     <div class="score-card ${t[i] === lead ? 'leader' : ''}">
       <div class="sc-name">${t[i] === lead ? '<span aria-label="leider">👑</span> ' : ''}${esc(p)}</div>
-      <div class="sc-total ${cls(t[i])}">${num(t[i])}</div>
+      <div class="sc-total ${tone(g, t[i])}">${num(t[i])}</div>
       ${i === dealer ? '<div class="badge">deler</div>' : ''}
     </div>`).join('');
 
@@ -231,10 +265,11 @@ function renderGame() {
   if (over) {
     const w = winners(g).map((i) => esc(g.players[i])).join(' & ');
     status = `
-      <div class="banner">🏆 <strong>${w}</strong> ${winners(g).length > 1 ? 'winnen' : 'wint'} met ${t[winners(g)[0]]} punten</div>
+      <div class="banner">🏆 <strong>${w}</strong> ${winners(g).length > 1 ? 'winnen' : 'wint'} met ${t[winners(g)[0]]} ${unit(g)}</div>
       <button class="btn btn-primary btn-xl" data-act="show-end">Uitslag bekijken</button>`;
   } else {
-    let info = `Ronde ${doneRounds(g) + 1} / ${totalRounds(g)}`;
+    let info = progress(g).replace(/^r/, 'R');
+    if (g.type === 'harten') info += ` · ${passLabel(nextIdx)}`;
     if (g.type === 'poepen') info += ` · <strong>${P.roundPlan(n)[nextIdx]} kaart${P.roundPlan(n)[nextIdx] > 1 ? 'en' : ''}</strong>`;
     if (g.type === 'wiezen' && nextIdx > 0 && g.rounds[nextIdx - 1].kind === 'pas') info += ' · <span class="badge badge-warn">×2 na rondje pas</span>';
     status = `
@@ -273,13 +308,19 @@ function renderHistory(g) {
       desc = esc(W.describe(r, g.players));
       if (W.isDoubled(g.rounds, i)) desc += ' · <span class="badge badge-warn">×2</span>';
       if (r.kind !== 'pas' && r.kind !== 'miserie') desc += W.isMade(r) ? ' <span class="ok">✓</span>' : ' <span class="ko">✗</span>';
+    } else if (g.type === 'harten') {
+      const moon = H.shooter(r);
+      desc = moon != null
+        ? `🌙 <strong>${esc(g.players[moon])}</strong> haalt alles`
+        : `${passLabel(i)} · ♠V ${esc(g.players[r.queen])}`;
     } else {
       desc = `${plan[i]} kaart${plan[i] > 1 ? 'en' : ''} · deler ${esc(g.players[dealerAt(g, i)])}`;
     }
     const cells = g.players.map((_, p) => `
       <td>
         ${g.type === 'poepen' ? `<span class="bidgot ${r.bids[p] === r.got[p] ? 'hit' : ''}">${r.bids[p]}/${r.got[p]}</span>` : ''}
-        <span class="delta ${cls(d[i][p])}">${fmt(d[i][p])}</span>
+        ${g.type === 'harten' ? `<span class="bidgot">♥${r.hearts[p]}${r.queen === p ? ' ♠V' : ''}</span>` : ''}
+        <span class="delta ${tone(g, d[i][p])}">${fmt(d[i][p])}</span>
         <span class="cum">${num(c[i][p])}</span>
       </td>`).join('');
     return `
@@ -305,6 +346,9 @@ function openEntry(editIndex = null) {
   const existing = editIndex != null ? structuredClone(g.rounds[editIndex]) : null;
   if (g.type === 'wiezen') {
     draft = { kind: null, players: [], level: null, trump: null, tricks: null, troelChanged: false, miserie: [], ...existing };
+  } else if (g.type === 'harten') {
+    draft = existing ?? { hearts: Array(H.PLAYERS).fill(0), queen: null };
+    draft.cards = H.HEARTS; // stepper max
   } else {
     const n = g.players.length;
     draft = existing ?? { bids: Array(n).fill(0), got: Array(n).fill(0) };
@@ -326,7 +370,7 @@ function cleanWiezen(d) {
 }
 
 function renderEntry() {
-  return data.current.type === 'wiezen' ? renderWiezenEntry() : renderPoepenEntry();
+  return { wiezen: renderWiezenEntry, poepen: renderPoepenEntry, harten: renderHartenEntry }[data.current.type]();
 }
 
 function renderWiezenEntry() {
@@ -460,6 +504,45 @@ function renderPoepenEntry() {
     ${entryBar(err)}`;
 }
 
+function renderHartenEntry() {
+  const g = data.current;
+  const d = draft;
+  const round = { hearts: d.hearts, queen: d.queen };
+  const sum = d.hearts.reduce((a, b) => a + b, 0);
+  const err = H.validate(round);
+
+  const rows = g.players.map((name, p) => `
+    <div class="p-row">
+      <div class="p-head"><strong>${esc(name)}</strong></div>
+      <div class="p-steps">
+        ${stepper('Harten ♥', 'hearts', p, d.hearts[p], d.cards)}
+        <div class="stepper">
+          <span class="st-label">Schoppenvrouw</span>
+          <button class="btn chip suit" aria-pressed="${d.queen === p}" data-act="h-queen" data-p="${p}">♠V</button>
+        </div>
+      </div>
+    </div>`).join('');
+
+  let preview = '';
+  if (!err) {
+    const s = H.scoreRound(round);
+    const moon = H.shooter(round);
+    preview = `<div class="preview">
+      ${moon != null ? `<p class="ok">🌙 ${esc(g.players[moon])} haalt alles: de anderen krijgen elk ${H.TOTAL}</p>` : ''}
+      <div class="preview-grid">${g.players.map((p, i) => `<span>${esc(p)}</span><b class="${tone(g, s[i])}">${fmt(s[i])}</b>`).join('')}</div>
+    </div>`;
+  }
+  return `
+    <p class="round-info big">${passLabel(d.index)}</p>
+    <div class="sums">
+      <span class="${sum === H.HEARTS ? 'ok' : 'ko'}">Harten: <b>${sum}</b> / ${H.HEARTS}</span>
+      <span class="${d.queen != null ? 'ok' : 'ko'}">♠V: <b>${d.queen != null ? esc(g.players[d.queen]) : '?'}</b></span>
+    </div>
+    <div class="stack">${rows}</div>
+    ${preview}
+    ${entryBar(err)}`;
+}
+
 function stepper(label, field, p, val, max) {
   return `
     <div class="stepper">
@@ -487,12 +570,13 @@ function entryBar(err) {
 function renderEnd() {
   const g = data.current;
   const t = totals(g);
-  const order = g.players.map((_, i) => i).sort((a, b) => t[b] - t[a]);
+  const dir = GAMES[g.type].lowWins ? 1 : -1;
+  const order = g.players.map((_, i) => i).sort((a, b) => dir * (t[a] - t[b]));
   const w = winners(g);
   let rank = 0;
   const list = order.map((i, k) => {
     if (k === 0 || t[i] !== t[order[k - 1]]) rank = k + 1;
-    return `<li class="${w.includes(i) ? 'win' : ''}"><span class="rank">${rank}</span><span class="rk-name">${esc(g.players[i])}</span><b class="${cls(t[i])}">${num(t[i])}</b></li>`;
+    return `<li class="${w.includes(i) ? 'win' : ''}"><span class="rank">${rank}</span><span class="rk-name">${esc(g.players[i])}</span><b class="${tone(g, t[i])}">${num(t[i])}</b></li>`;
   }).join('');
   return `
     <div class="trophy">🏆</div>
@@ -525,6 +609,10 @@ const actions = {
     if (g && g.rounds.length && !isOver(g) && !confirm('Er loopt nog een spel. Toch een nieuw spel starten?')) return;
     startSetup(type);
   },
+  'setup-limit'({ n }) {
+    setup.limit = +n;
+    render();
+  },
   'setup-rounds'({ n }) {
     setup.targetRounds = +n;
     render();
@@ -546,6 +634,7 @@ const actions = {
     data.current = {
       id: Date.now(), type: setup.type, players, rounds: [],
       targetRounds: setup.type === 'wiezen' ? setup.targetRounds : null,
+      limit: setup.type === 'harten' ? setup.limit : null,
       createdAt: new Date().toISOString(), ended: false,
     };
     save();
@@ -640,7 +729,13 @@ const actions = {
     render();
   },
 
-  // poepen entry
+  // harten entry
+  'h-queen'({ p }) {
+    draft.queen = draft.queen === +p ? null : +p;
+    render();
+  },
+
+  // poepen entry (also used for the harten steppers)
   'p-step'({ f, p, d }) {
     const arr = draft[f];
     arr[+p] = Math.max(0, Math.min(draft.cards, arr[+p] + +d));
@@ -653,6 +748,9 @@ const actions = {
     if (g.type === 'wiezen') {
       round = cleanWiezen(draft);
       if (W.validate(round)) return;
+    } else if (g.type === 'harten') {
+      round = { hearts: [...draft.hearts], queen: draft.queen };
+      if (H.validate(round)) return;
     } else {
       if (draft.got.reduce((a, b) => a + b, 0) !== draft.cards) return;
       round = { bids: [...draft.bids], got: [...draft.got] };
