@@ -33,8 +33,9 @@ export function scoreRounds(rounds) {
   return rounds.map(scoreRound);
 }
 
+// limit null = no limit (play until the players stop)
 export function isOver(totals, limit) {
-  return totals.some((t) => t >= limit);
+  return limit != null && totals.some((t) => t >= limit);
 }
 
 // Is the round complete enough to be scored/saved?

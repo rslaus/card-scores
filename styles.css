@@ -291,3 +291,10 @@ h2 small { text-transform: none; letter-spacing: 0; font-weight: 400; margin-lef
 .rank { width: 28px; font-weight: 800; color: var(--muted); }
 .rk-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ranking b { font-variant-numeric: tabular-nums; }
+
+/* ---------- manille ---------- */
+.row > .btn.grow { flex: 2; }
+.team-tag { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.m-points { display: flex; align-items: center; gap: 8px; }
+.m-points .st-btn { font-size: 1.1rem; font-weight: 700; }
+.m-points .st-val { font-size: 2rem; }

@@ -1,5 +1,5 @@
 // Bump on every change to a cached file so clients pick up the new version.
-const CACHE_VERSION = 'kaartscores-v2';
+const CACHE_VERSION = 'kaartscores-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const ASSETS = [
   './js/wiezen.js',
   './js/poepen.js',
   './js/harten.js',
+  './js/manille.js',
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.png',

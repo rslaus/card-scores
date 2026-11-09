@@ -15,6 +15,12 @@ export function roundPlan(n) {
   return up.concat(up.slice(0, -1).reverse());
 }
 
+// Cards in round i; endless games repeat the 1 -> max -> 1 series.
+export function cardsFor(n, i, endless = false) {
+  const plan = roundPlan(n);
+  return endless ? plan[i % plan.length] : plan[i];
+}
+
 export function scorePlayer(bid, got) {
   return bid === got ? 6 + 2 * got : -2 * Math.abs(bid - got);
 }

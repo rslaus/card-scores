@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as W from '../js/wiezen.js';
 import * as P from '../js/poepen.js';
 import * as H from '../js/harten.js';
+import * as M from '../js/manille.js';
 
 const sum = (a) => a.reduce((x, y) => x + y, 0);
 
@@ -140,4 +141,70 @@ test('harten: pass cycle and game end', () => {
   assert.equal(H.isOver([99, 0, 50, 20], 100), false);
   assert.equal(H.isOver([100, 0, 50, 20], 100), true);
   assert.equal(H.isOver([12, 0, 130, 20], 100), true);
+});
+
+// ---------- manille ----------
+const m = (trump, double, points) => ({ trump, double, points });
+
+test('Manille 4p: dealer team 39 -> partners +9', () => {
+  assert.deepEqual(M.scoreRound(m('H', 'none', 39), { n: 4, dealer: 0 }), [9, 0, 9, 0]);
+});
+
+test('Manille 4p: dealer team 21 -> other team +9', () => {
+  assert.deepEqual(M.scoreRound(m('S', 'none', 21), { n: 4, dealer: 1 }), [9, 0, 9, 0]);
+});
+
+test('Manille multipliers: zonder ×2, mee ×2, tegen ×4, capped at ×4', () => {
+  assert.equal(M.multiplier(m('zt', 'none', 40)), 2);
+  assert.equal(M.multiplier(m('H', 'mee', 40)), 2);
+  assert.equal(M.multiplier(m('H', 'tegen', 40)), 4);
+  assert.equal(M.multiplier(m('zt', 'mee', 40)), 4);
+  assert.equal(M.multiplier(m('zt', 'tegen', 40)), 4);
+  assert.equal(M.multiplier(m('H', 'mee', 40), true), 4);
+  assert.deepEqual(M.scoreRound(m('zt', 'mee', 60), { n: 4, dealer: 2 }), [120, 0, 120, 0]);
+});
+
+test('Manille draw: 30-30 scores nothing and doubles the next deal once', () => {
+  const rounds = [m('H', 'none', 30), m('D', 'none', 30), m('C', 'none', 40)];
+  const s = M.scoreRounds(rounds, 4);
+  assert.deepEqual(s[0], [0, 0, 0, 0]);
+  assert.deepEqual(s[1], [0, 0, 0, 0]);
+  // round 2 dealt by player 2, doubled once after the draw: (40-30)*2
+  assert.deepEqual(s[2], [20, 0, 20, 0]);
+});
+
+test('Manille 3p: dealer alone; duo win scores for both defenders', () => {
+  assert.deepEqual(M.scoreRound(m('H', 'none', 25), { n: 3, dealer: 1 }), [5, 0, 5]);
+  assert.deepEqual(M.scoreRound(m('H', 'none', 45), { n: 3, dealer: 1 }), [0, 15, 0]);
+});
+
+test('Manille 2p: each for themselves', () => {
+  assert.deepEqual(M.scoreRound(m('C', 'tegen', 33), { n: 2, dealer: 1 }), [0, 12]);
+  assert.deepEqual(M.scoreRound(m('C', 'none', 10), { n: 2, dealer: 1 }), [20, 0]);
+});
+
+test('Manille dealer rotates every deal, game ends at target, null = open-ended', () => {
+  assert.deepEqual([0, 1, 2, 3, 4].map((i) => M.dealerFor(4, i)), [0, 1, 2, 3, 0]);
+  assert.equal(M.isOver([101, 0, 101, 0], 101), true);
+  assert.equal(M.isOver([100, 0, 100, 0], 101), false);
+  assert.equal(M.isOver([500, 0, 500, 0], null), false);
+});
+
+test('Manille validate', () => {
+  assert.match(M.validate(m(null, 'none', 30)), /troef/);
+  assert.match(M.validate(m('H', 'none', 61)), /tussen/);
+  assert.equal(M.validate(m('zt', 'none', 0)), null);
+});
+
+// ---------- open-ended games ----------
+test('Harten without limit never ends', () => {
+  assert.equal(H.isOver([999, 0, 0, 0], null), false);
+  assert.equal(H.isOver([100, 0, 0, 0], 100), true);
+});
+
+test('Poepen endless repeats the 1 -> max -> 1 series', () => {
+  const plan = P.roundPlan(4); // 1..12..1, 23 rounds
+  assert.equal(P.cardsFor(4, plan.length, false), undefined);
+  assert.equal(P.cardsFor(4, plan.length, true), 1);
+  assert.equal(P.cardsFor(4, plan.length + 11, true), 12);
 });
